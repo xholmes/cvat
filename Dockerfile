@@ -107,6 +107,7 @@ RUN  pip3 install --no-cache-dir -r /tmp/requirements/${DJANGO_CONFIGURATION}.tx
 # Install git application dependencies
 RUN apt-get update && \
     apt-get install -y ssh netcat-openbsd git curl zip  && \
+	apt-get install -y dos2unix && \
     wget -qO /dev/stdout https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
     apt-get install -y git-lfs && \
     git lfs install && \
@@ -138,7 +139,7 @@ RUN if [ "$WITH_DEXTR" = "yes" ]; then \
 COPY ssh ${HOME}/.ssh
 COPY cvat/ ${HOME}/cvat
 COPY tests ${HOME}/tests
-RUN patch -p1 < ${HOME}/cvat/apps/engine/static/engine/js/3rdparty.patch
+RUN	patch --binary -p1 < ${HOME}/cvat/apps/engine/static/engine/js/3rdparty.patch
 RUN chown -R ${USER}:${USER} .
 
 # RUN all commands below as 'django' user
