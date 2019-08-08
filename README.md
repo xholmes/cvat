@@ -59,3 +59,19 @@ report).
 
 If you are not sure or just want to browse other users common questions,
 [Gitter chat](https://gitter.im/opencv-cvat) is the way to go.
+
+
+## Installation issues and workaround
+Issue in installing OpenVino when building docker images - fixing '" is not a valid value for ACCEPT_EULA'
+This happens if installing in Windows environment. Work around is to execute the following at the root directory:
+
+```
+git checkout develop
+git pull origin develop
+# Start from here if you have already pulled from the 'develop' branch
+git rm --cached -r .
+git reset --hard
+# Build container
+```
+
+Reference: https://github.com/opencv/cvat/issues/549
