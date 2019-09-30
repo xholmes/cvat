@@ -1,0 +1,21 @@
+version: "2.3"
+
+services:
+  cvat:
+    environment:
+      CVAT_SHARE_URL: "Shared directory"
+    volumes:
+      - cvat_data:/home/django/data
+      - cvat_share:/home/django/share:ro
+
+volumes:
+  cvat_data:
+    driver_opts:
+      type: none
+      device: //d/docker-share/cvat_data_folder
+      o: bind
+  cvat_share:
+    driver_opts:
+      type: none
+      device: //d/docker-share
+      o: bind
