@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2018 Intel Corporation
+* Copyright (C) 2019 Intel Corporation
 * SPDX-License-Identifier: MIT
 */
 
@@ -56,7 +56,7 @@
             if (typeof (value) !== type) {
                 // specific case for integers which aren't native type in JS
                 if (type === 'integer' && Number.isInteger(value)) {
-                    return;
+                    return true;
                 }
 
                 throw new ArgumentError(
@@ -77,6 +77,8 @@
                 );
             }
         }
+
+        return true;
     }
 
     module.exports = {

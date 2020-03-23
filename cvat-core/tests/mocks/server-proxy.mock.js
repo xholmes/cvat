@@ -12,6 +12,7 @@
 const {
     tasksDummyData,
     aboutDummyData,
+    formatsDummyData,
     shareDummyData,
     usersDummyData,
     taskAnnotationsDummyData,
@@ -46,6 +47,10 @@ class ServerProxy {
             }
 
             return JSON.parse(JSON.stringify(position));
+        }
+
+        async function formats() {
+            return JSON.parse(JSON.stringify(formatsDummyData));
         }
 
         async function exception() {
@@ -187,6 +192,10 @@ class ServerProxy {
             return JSON.parse(JSON.stringify(usersDummyData)).results[0];
         }
 
+        async function getPreview() {
+            return 'DUMMY_IMAGE';
+        }
+
         async function getData() {
             return 'DUMMY_IMAGE';
         }
@@ -239,6 +248,7 @@ class ServerProxy {
                 value: Object.freeze({
                     about,
                     share,
+                    formats,
                     exception,
                     login,
                     logout,
@@ -276,16 +286,18 @@ class ServerProxy {
                 value: Object.freeze({
                     getData,
                     getMeta,
+                    getPreview,
                 }),
                 writable: false,
             },
 
             annotations: {
-                value: Object.freeze({
+                value: {
                     updateAnnotations,
                     getAnnotations,
-                }),
-                writable: false,
+                },
+                // To implement on of important tests
+                writable: true,
             },
         }));
     }

@@ -1,9 +1,11 @@
 # Computer Vision Annotation Tool (CVAT)
 
 [![Build Status](https://travis-ci.org/opencv/cvat.svg?branch=develop)](https://travis-ci.org/opencv/cvat)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/840351da141e4eaeac6476fd19ec0a33)](https://app.codacy.com/app/nmanovic/cvat?utm_source=github.com&utm_medium=referral&utm_content=opencv/cvat&utm_campaign=Badge_Grade_Settings)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/840351da141e4eaeac6476fd19ec0a33)](https://app.codacy.com/app/cvat/cvat?utm_source=github.com&utm_medium=referral&utm_content=opencv/cvat&utm_campaign=Badge_Grade_Dashboard)
 [![Gitter chat](https://badges.gitter.im/opencv-cvat/gitter.png)](https://gitter.im/opencv-cvat)
 [![Coverage Status](https://coveralls.io/repos/github/opencv/cvat/badge.svg?branch=)](https://coveralls.io/github/opencv/cvat?branch=develop)
+[![codebeat badge](https://codebeat.co/badges/53cd0d16-fddc-46f8-903c-f43ed9abb6dd)](https://codebeat.co/projects/github-com-opencv-cvat-develop)
+[![DOI](https://zenodo.org/badge/139156354.svg)](https://zenodo.org/badge/latestdoi/139156354)
 
 CVAT is free, online, interactive video and image annotation tool for computer vision. It is being used by our team to annotate million of objects with different properties. Many UI and UX decisions are based on feedbacks from professional data annotation team.
 
@@ -13,6 +15,9 @@ CVAT is free, online, interactive video and image annotation tool for computer v
 
 - [Installation guide](cvat/apps/documentation/installation.md)
 - [User's guide](cvat/apps/documentation/user_guide.md)
+- [Django REST API documentation](#rest-api)
+- [Datumaro dataset framework](datumaro/README.md)
+- [Command line interface](utils/cli/)
 - [XML annotation format](cvat/apps/documentation/xml_format.md)
 - [AWS Deployment Guide](cvat/apps/documentation/AWS-Deployment-Guide.md)
 - [Questions](#questions)
@@ -30,13 +35,20 @@ CVAT is free, online, interactive video and image annotation tool for computer v
 ## Supported annotation formats
 
 Format selection is possible after clicking on the Upload annotation / Dump annotation button.
+[Datumaro](datumaro/README.md) dataset framework allows additional dataset transformations
+via its command line tool.
 
-| Annotation format         | Dumper | Loader |
-| ------------------------- | ------ | ------ |
-| CVAT XML v1.1 for images  | X      | X      |
-| CVAT XML v1.1 for a video | X      | X      |
-| Pascal VOC                | X      | X      |
-| YOLO                      | X      | X      |
+| Annotation format                                                                          | Dumper | Loader |
+| ------------------------------------------------------------------------------------------ | ------ | ------ |
+| [CVAT XML v1.1 for images](cvat/apps/documentation/xml_format.md#annotation)               | X      | X      |
+| [CVAT XML v1.1 for a video](cvat/apps/documentation/xml_format.md#interpolation)           | X      | X      |
+| [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/)                                      | X      | X      |
+| [YOLO](https://pjreddie.com/darknet/yolo/)                                                 | X      | X      |
+| [MS COCO Object Detection](http://cocodataset.org/#format-data)                            | X      | X      |
+| PNG class mask + instance mask as in [Pascal VOC](http://host.robots.ox.ac.uk/pascal/VOC/) | X      | X      |
+| [TFrecord](https://www.tensorflow.org/tutorials/load_data/tf_records)                      | X      | X      |
+| [MOT](https://motchallenge.net/)                                                           | X      | X      |
+| [LabelMe](http://labelme.csail.mit.edu/Release3.0)                                         | X      | X      |
 
 ## Links
 - [Intel AI blog: New Computer Vision Tool Accelerates Annotation of Digital Images and Video](https://www.intel.ai/introducing-cvat)
@@ -45,14 +57,14 @@ Format selection is possible after clicking on the Upload annotation / Dump anno
 
 ## Online Demo
 
-[Onepanel](https://www.onepanel.io/) has added CVAT as an environment into their platform and a running demo of CVAT can be accessed at [CVAT Public Demo](https://c.onepanel.io/onepanel-demo/projects/cvat-public-demo/workspaces).
-
-After you click the link above:
-
-- Click on "GO TO WORKSPACE" and the CVAT environment will load up
-- The environment is backed by a K80 GPU
+[Onepanel](https://www.onepanel.io/) has added CVAT as an environment into their platform and a running demo of CVAT can be accessed at [CVAT Public Demo](https://c.onepanel.io/onepanel-demo/projects/cvat-public-demo/workspaces?utm_source=cvat).
 
 If you have any questions, please contact Onepanel directly at support@onepanel.io. If you are in the Onepanel application, you can also use the chat icon in the bottom right corner.
+
+## REST API
+
+Automatically generated Swagger documentation for Django REST API is
+available on ``<cvat_origin>/api/swagger`` (default: ``localhost:8080/api/swagger``).
 
 ## LICENSE
 
@@ -66,23 +78,11 @@ contributors and other users.
 
 However, if you have a feature request or a bug report that can reproduced,
 feel free to open an issue (with steps to reproduce the bug if it's a bug
-report).
+report) on [GitHub* issues](https://github.com/opencv/cvat/issues).
 
 If you are not sure or just want to browse other users common questions,
 [Gitter chat](https://gitter.im/opencv-cvat) is the way to go.
 
-
-## Installation issues and workaround
-Issue in installing OpenVino when building docker images - fixing '" is not a valid value for ACCEPT_EULA'
-This happens if installing in Windows environment. Work around is to execute the following at the root directory:
-
-```
-git checkout develop
-git pull origin develop
-# Start from here if you have already pulled from the 'develop' branch
-git rm --cached -r .
-git reset --hard
-# Build container
-```
-
-Reference: https://github.com/opencv/cvat/issues/549
+Other ways to ask questions and get our support:
+* [\#cvat](https://stackoverflow.com/search?q=%23cvat) tag on StackOverflow*
+* [Forum on Intel Developer Zone](https://software.intel.com/en-us/forums/computer-vision)

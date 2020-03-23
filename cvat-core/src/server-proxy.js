@@ -1,35 +1,41 @@
 /*
-* Copyright (C) 2018 Intel Corporation
+* Copyright (C) 2019 Intel Corporation
 * SPDX-License-Identifier: MIT
 */
 
 /* global
     require:false
-    encodeURIComponent:false
 */
 
 (() => {
     const FormData = require('form-data');
     const {
         ServerError,
-        ScriptingError,
     } = require('./exceptions');
-
+    const store = require('store');
     const config = require('./config');
+
+    function generateError(errorData) {
+        if (errorData.response) {
+            const message = `${errorData.message}. ${JSON.stringify(errorData.response.data) || ''}.`;
+            return new ServerError(message, errorData.response.status);
+        }
+
+        // Server is unavailable (no any response)
+        const message = `${errorData.message}.`; // usually is "Error Network"
+        return new ServerError(message, 0);
+    }
 
     class ServerProxy {
         constructor() {
-            const Cookie = require('js-cookie');
             const Axios = require('axios');
+            Axios.defaults.withCredentials = true;
+            Axios.defaults.xsrfHeaderName = 'X-CSRFTOKEN';
+            Axios.defaults.xsrfCookieName = 'csrftoken';
 
-            function setCSRFHeader(header) {
-                Axios.defaults.headers.delete['X-CSRFToken'] = header;
-                Axios.defaults.headers.patch['X-CSRFToken'] = header;
-                Axios.defaults.headers.post['X-CSRFToken'] = header;
-                Axios.defaults.headers.put['X-CSRFToken'] = header;
-
-                // Allows to move authentification headers to backend
-                Axios.defaults.withCredentials = true;
+            let token = store.get('token');
+            if (token) {
+                Axios.defaults.headers.common.Authorization = `Token ${token}`;
             }
 
             async function about() {
@@ -41,11 +47,7 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get "about" information from the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -61,11 +63,7 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get "share" information from the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -82,124 +80,131 @@
                         },
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not send an exception to the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
             }
 
-            async function login(username, password) {
-                function setCookie(response) {
-                    if (response.headers['set-cookie']) {
-                        // Browser itself setup cookie and header is none
-                        // In NodeJS we need do it manually
-                        let cookies = '';
-                        for (let cookie of response.headers['set-cookie']) {
-                            [cookie] = cookie.split(';'); // truncate extra information
-                            const name = cookie.split('=')[0];
-                            const value = cookie.split('=')[1];
-                            if (name === 'csrftoken') {
-                                setCSRFHeader(value);
-                            }
-                            Cookie.set(name, value);
-                            cookies += `${cookie};`;
-                        }
+            async function formats() {
+                const { backendAPI } = config;
 
-                        Axios.defaults.headers.common.Cookie = cookies;
-                    } else {
-                        // Browser code. We need set additinal header for authentification
-                        let csrftoken = response.data.csrf;
-                        if (csrftoken) {
-                            setCSRFHeader(csrftoken);
-                            Cookie.set('csrftoken', csrftoken);
-                        } else {
-                            csrftoken = Cookie.get('csrftoken');
-                            if (csrftoken) {
-                                setCSRFHeader(csrftoken);
-                            } else {
-                                throw new ScriptingError(
-                                    'An environment has been detected as a browser'
-                                    + ', but CSRF token has not been found in cookies',
-                                );
-                            }
-                        }
-                    }
-                }
-
-                const host = config.backendAPI.slice(0, -7);
-                let csrf = null;
+                let response = null;
                 try {
-                    csrf = await Axios.get(`${host}/auth/csrf`, {
+                    response = await Axios.get(`${backendAPI}/server/annotation/formats`, {
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get CSRF token from a server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
-                setCookie(csrf);
+                return response.data;
+            }
 
-                const authentificationData = ([
+            async function datasetFormats() {
+                const { backendAPI } = config;
+
+                let response = null;
+                try {
+                    response = await Axios.get(`${backendAPI}/server/dataset/formats`, {
+                        proxy: config.proxy,
+                    });
+                    response = JSON.parse(response.data);
+                } catch (errorData) {
+                    throw generateError(errorData);
+                }
+
+                return response;
+            }
+
+            async function register(username, firstName, lastName, email, password1, password2) {
+                let response = null;
+                try {
+                    const data = JSON.stringify({
+                        username,
+                        first_name: firstName,
+                        last_name: lastName,
+                        email,
+                        password1,
+                        password2,
+                    });
+                    response = await Axios.post(`${config.backendAPI}/auth/register`, data, {
+                        proxy: config.proxy,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                } catch (errorData) {
+                    throw generateError(errorData);
+                }
+
+                return response.data;
+            }
+
+            async function login(username, password) {
+                const authenticationData = ([
                     `${encodeURIComponent('username')}=${encodeURIComponent(username)}`,
                     `${encodeURIComponent('password')}=${encodeURIComponent(password)}`,
                 ]).join('&').replace(/%20/g, '+');
 
-                let authentificationResponse = null;
+                Axios.defaults.headers.common.Authorization = '';
+                let authenticationResponse = null;
                 try {
-                    authentificationResponse = await Axios.post(
-                        `${host}/auth/login`,
-                        authentificationData,
-                        {
-                            'Content-Type': 'application/x-www-form-urlencoded',
+                    authenticationResponse = await Axios.post(
+                        `${config.backendAPI}/auth/login`,
+                        authenticationData, {
                             proxy: config.proxy,
-                            // do not redirect to a dashboard,
-                            // otherwise we don't get a session id in a response
-                            maxRedirects: 0,
                         },
                     );
                 } catch (errorData) {
-                    if (errorData.response.status === 302) {
-                        // Redirection code expected
-                        authentificationResponse = errorData.response;
-                    } else {
-                        const code = errorData.response
-                            ? errorData.response.status : errorData.code;
-                        throw new ServerError(
-                            'Could not login on a server',
-                            code,
-                        );
-                    }
+                    throw generateError(errorData);
                 }
 
-                // TODO: Perhaps we should redesign the authorization method on the server.
-                if (authentificationResponse.data.includes('didn\'t match')) {
-                    throw new ServerError(
-                        'The pair login/password is invalid',
-                        403,
-                    );
+                if (authenticationResponse.headers['set-cookie']) {
+                    // Browser itself setup cookie and header is none
+                    // In NodeJS we need do it manually
+                    const cookies = authenticationResponse.headers['set-cookie'].join(';');
+                    Axios.defaults.headers.common.Cookie = cookies;
                 }
 
-                setCookie(authentificationResponse);
+                token = authenticationResponse.data.key;
+                store.set('token', token);
+                Axios.defaults.headers.common.Authorization = `Token ${token}`;
             }
 
             async function logout() {
-                const host = config.backendAPI.slice(0, -7);
-
                 try {
-                    await Axios.get(`${host}/auth/logout`, {
+                    await Axios.post(`${config.backendAPI}/auth/logout`, {
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not logout from the server',
-                        code,
-                    );
+                    throw generateError(errorData);
+                }
+
+                store.remove('token');
+                Axios.defaults.headers.common.Authorization = '';
+            }
+
+            async function authorized() {
+                try {
+                    await module.exports.users.getSelf();
+                } catch (serverError) {
+                    if (serverError.code === 401) {
+                        return false;
+                    }
+
+                    throw serverError;
+                }
+
+                return true;
+            }
+
+            async function serverRequest(url, data) {
+                try {
+                    return (await Axios({
+                        url,
+                        ...data,
+                    })).data;
+                } catch (errorData) {
+                    throw generateError(errorData);
                 }
             }
 
@@ -208,15 +213,11 @@
 
                 let response = null;
                 try {
-                    response = await Axios.get(`${backendAPI}/tasks?${filter}`, {
+                    response = await Axios.get(`${backendAPI}/tasks?page_size=10&${filter}`, {
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get tasks from a server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 response.data.results.count = response.data.count;
@@ -234,11 +235,7 @@
                         },
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not save the task on the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
             }
 
@@ -248,12 +245,34 @@
                 try {
                     await Axios.delete(`${backendAPI}/tasks/${id}`);
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not delete the task from the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
+            }
+
+            async function exportDataset(id, format) {
+                const { backendAPI } = config;
+                let url = `${backendAPI}/tasks/${id}/dataset?format=${format}`;
+
+                return new Promise((resolve, reject) => {
+                    async function request() {
+                        try {
+                            const response = await Axios
+                                .get(`${url}`, {
+                                    proxy: config.proxy,
+                                });
+                            if (response.status === 202) {
+                                setTimeout(request, 3000);
+                            } else {
+                                url = `${url}&action=download`;
+                                resolve(url);
+                            }
+                        } catch (errorData) {
+                            reject(generateError(errorData));
+                        }
+                    }
+
+                    setTimeout(request);
+                });
             }
 
             async function createTask(taskData, files, onUpdate) {
@@ -274,26 +293,21 @@
                                 } else if (response.data.state === 'Failed') {
                                     // If request has been successful, but task hasn't been created
                                     // Then passed data is wrong and we can pass code 400
-                                    reject(new ServerError(
-                                        'Could not create the task on the server',
-                                        400,
-                                    ));
+                                    const message = 'Could not create the task on the server. '
+                                        + `${response.data.message}.`;
+                                    reject(new ServerError(message, 400));
                                 } else {
                                     // If server has another status, it is unexpected
                                     // Therefore it is server error and we can pass code 500
                                     reject(new ServerError(
-                                        `Unknown task state has been recieved: ${response.data.state}`,
+                                        `Unknown task state has been received: ${response.data.state}`,
                                         500,
                                     ));
                                 }
                             } catch (errorData) {
-                                const code = errorData.response
-                                    ? errorData.response.status : errorData.code;
-
-                                reject(new ServerError(
-                                    'Data uploading error occured',
-                                    code,
-                                ));
+                                reject(
+                                    generateError(errorData),
+                                );
                             }
                         }
 
@@ -321,11 +335,7 @@
                         },
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not put task to the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 onUpdate('The data is being uploaded to the server..');
@@ -334,12 +344,13 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    await deleteTask(response.data.id);
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not put data to the server',
-                        code,
-                    );
+                    try {
+                        await deleteTask(response.data.id);
+                    } catch (_) {
+                        // ignore
+                    }
+
+                    throw generateError(errorData);
                 }
 
                 try {
@@ -348,7 +359,6 @@
                     await deleteTask(response.data.id);
                     throw createException;
                 }
-
 
                 const createdTask = await getTasks(`?id=${response.id}`);
                 return createdTask[0];
@@ -363,11 +373,7 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get jobs from a server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -384,28 +390,26 @@
                         },
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not save the job on the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
             }
 
-            async function getUsers() {
+            async function getUsers(id = null) {
                 const { backendAPI } = config;
 
                 let response = null;
                 try {
-                    response = await Axios.get(`${backendAPI}/users`, {
-                        proxy: config.proxy,
-                    });
+                    if (id === null) {
+                        response = await Axios.get(`${backendAPI}/users?page_size=all`, {
+                            proxy: config.proxy,
+                        });
+                    } else {
+                        response = await Axios.get(`${backendAPI}/users/${id}`, {
+                            proxy: config.proxy,
+                        });
+                    }
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        'Could not get users from the server',
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data.results;
@@ -420,9 +424,26 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
+                    throw generateError(errorData);
+                }
+
+                return response.data;
+            }
+
+            async function getPreview(tid) {
+                const { backendAPI } = config;
+
+                let response = null;
+                try {
+                    // TODO: change 0 frame to preview
+                    response = await Axios.get(`${backendAPI}/tasks/${tid}/frames/0`, {
+                        proxy: config.proxy,
+                        responseType: 'blob',
+                    });
+                } catch (errorData) {
                     const code = errorData.response ? errorData.response.status : errorData.code;
                     throw new ServerError(
-                        'Could not get users from the server',
+                        `Could not get preview frame for the task ${tid} from the server`,
                         code,
                     );
                 }
@@ -440,11 +461,7 @@
                         responseType: 'blob',
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        `Could not get frame ${frame} for the task ${tid} from the server`,
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -459,11 +476,7 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        `Could not get frame meta info for the task ${tid} from the server`,
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -479,11 +492,7 @@
                         proxy: config.proxy,
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        `Could not get annotations for the ${session} ${id} from the server`,
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -511,11 +520,7 @@
                         },
                     });
                 } catch (errorData) {
-                    const code = errorData.response ? errorData.response.status : errorData.code;
-                    throw new ServerError(
-                        `Could not updated annotations for the ${session} ${id} on the server`,
-                        code,
-                    );
+                    throw generateError(errorData);
                 }
 
                 return response.data;
@@ -532,7 +537,7 @@
                     async function request() {
                         try {
                             const response = await Axios
-                                .post(`${backendAPI}/${session}s/${id}/annotations?upload_format=${format}`, annotationData, {
+                                .put(`${backendAPI}/${session}s/${id}/annotations?format=${format}`, annotationData, {
                                     proxy: config.proxy,
                                 });
                             if (response.status === 202) {
@@ -542,13 +547,7 @@
                                 resolve();
                             }
                         } catch (errorData) {
-                            const code = errorData.response
-                                ? errorData.response.status : errorData.code;
-                            const error = new ServerError(
-                                `Could not upload annotations for the ${session} ${id}`,
-                                code,
-                            );
-                            reject(error);
+                            reject(generateError(errorData));
                         }
                     }
 
@@ -560,42 +559,44 @@
             async function dumpAnnotations(id, name, format) {
                 const { backendAPI } = config;
                 const filename = name.replace(/\//g, '_');
-                let url = `${backendAPI}/tasks/${id}/annotations/${filename}?dump_format=${format}`;
+                const baseURL = `${backendAPI}/tasks/${id}/annotations/${encodeURIComponent(filename)}`;
+                let query = `format=${encodeURIComponent(format)}`;
+                let url = `${baseURL}?${query}`;
 
                 return new Promise((resolve, reject) => {
                     async function request() {
-                        try {
-                            const response = await Axios
-                                .get(`${url}`, {
-                                    proxy: config.proxy,
-                                });
+                        Axios.get(`${url}`, {
+                            proxy: config.proxy,
+                        }).then((response) => {
                             if (response.status === 202) {
                                 setTimeout(request, 3000);
                             } else {
-                                url = `${url}&action=download`;
+                                query = `${query}&action=download`;
+                                url = `${baseURL}?${query}`;
                                 resolve(url);
                             }
-                        } catch (errorData) {
-                            const code = errorData.response
-                                ? errorData.response.status : errorData.code;
-                            const error = new ServerError(
-                                `Could not dump annotations for the task ${id} from the server`,
-                                code,
-                            );
-                            reject(error);
-                        }
+                        }).catch((errorData) => {
+                            reject(generateError(errorData));
+                        });
                     }
 
                     setTimeout(request);
                 });
             }
 
-            // Set csrftoken header from browser cookies if it exists
-            // NodeJS env returns 'undefined'
-            // So in NodeJS we need login after each run
-            const csrftoken = Cookie.get('csrftoken');
-            if (csrftoken) {
-                setCSRFHeader(csrftoken);
+            async function saveLogs(logs) {
+                const { backendAPI } = config;
+
+                try {
+                    await Axios.post(`${backendAPI}/server/logs`, JSON.stringify(logs), {
+                        proxy: config.proxy,
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                } catch (errorData) {
+                    throw generateError(errorData);
+                }
             }
 
             Object.defineProperties(this, Object.freeze({
@@ -603,9 +604,14 @@
                     value: Object.freeze({
                         about,
                         share,
+                        formats,
+                        datasetFormats,
                         exception,
                         login,
                         logout,
+                        authorized,
+                        register,
+                        request: serverRequest,
                     }),
                     writable: false,
                 },
@@ -616,6 +622,7 @@
                         saveTask,
                         createTask,
                         deleteTask,
+                        exportDataset,
                     }),
                     writable: false,
                 },
@@ -640,6 +647,7 @@
                     value: Object.freeze({
                         getData,
                         getMeta,
+                        getPreview,
                     }),
                     writable: false,
                 },
@@ -650,6 +658,13 @@
                         getAnnotations,
                         dumpAnnotations,
                         uploadAnnotations,
+                    }),
+                    writable: false,
+                },
+
+                logs: {
+                    value: Object.freeze({
+                        save: saveLogs,
                     }),
                     writable: false,
                 },

@@ -1,10 +1,8 @@
 # Module CVAT-CANVAS
 
 ## Description
-The CVAT module presents a canvas to viewing, drawing and editing of annotations.
-
-- It has been written on typescript
-- It contains the class ```Canvas``` and the enum ```Rotation```
+The CVAT module written in TypeScript language.
+It presents a canvas to viewing, drawing and editing of annotations.
 
 ## Commands
 - Building of the module from sources in the ```dist``` directory:
@@ -21,15 +19,7 @@ npm version minor   # updated after major changes which don't affect API compati
 npm version major   # updated after major changes which affect API compatibility with previous versions
 ```
 
-## Creation
-Canvas is created by using constructor:
-
-```js
-    const { Canvas } = require('./canvas');
-    const canvas = new Canvas();
-```
-
-- Canvas has transparent background
+## Using
 
 Canvas itself handles:
 - Shape context menu (PKM)
@@ -39,72 +29,164 @@ Canvas itself handles:
 - Remove point (PKM)
 - Polyshape editing (Shift + LKM)
 
-## API
-### Methods
-
-All methods are sync.
+### API Methods
 
 ```ts
-    html(): HTMLDivElement;
-    setup(frameData: FrameData, objectStates: ObjectState): void;
-    activate(clientID: number, attributeID?: number): void;
-    rotate(rotation: Rotation, remember?: boolean): void;
-    focus(clientID: number, padding?: number): void;
-    fit(): void;
-    grid(stepX: number, stepY: number): void;
+    enum RectDrawingMethod {
+        CLASSIC = 'By 2 points',
+        EXTREME_POINTS = 'By 4 points'
+    }
 
-    draw(enabled?: boolean, shapeType?: string, numberOfPoints?: number, initialState?: any): void | ObjectState;
-    split(enabled?: boolean): void | ObjectState;
-    group(enabled?: boolean): void | ObjectState;
-    merge(enabled?: boolean): void | ObjectState;
+    enum Mode {
+        IDLE = 'idle',
+        DRAG = 'drag',
+        RESIZE = 'resize',
+        DRAW = 'draw',
+        EDIT = 'edit',
+        MERGE = 'merge',
+        SPLIT = 'split',
+        GROUP = 'group',
+        DRAG_CANVAS = 'drag_canvas',
+        ZOOM_CANVAS = 'zoom_canvas',
+    }
 
-    cancel(): any;
+    interface DrawData {
+        enabled: boolean;
+        shapeType?: string;
+        rectDrawingMethod?: RectDrawingMethod;
+        numberOfPoints?: number;
+        initialState?: any;
+        crosshair?: boolean;
+    }
+
+    interface GroupData {
+        enabled: boolean;
+        resetGroup?: boolean;
+    }
+
+    interface MergeData {
+        enabled: boolean;
+    }
+
+    interface SplitData {
+        enabled: boolean;
+    }
+
+    interface DrawnData {
+        shapeType: string;
+        points: number[];
+        objectType?: string;
+        occluded?: boolean;
+        attributes?: [index: number]: string;
+        label?: Label;
+        color?: string;
+    }
+
+    interface Canvas {
+        mode(): Mode;
+        html(): HTMLDivElement;
+        setZLayer(zLayer: number | null): void;
+        setup(frameData: any, objectStates: any[]): void;
+        activate(clientID: number, attributeID?: number): void;
+        rotate(frameAngle: number): void;
+        focus(clientID: number, padding?: number): void;
+        fit(): void;
+        grid(stepX: number, stepY: number): void;
+
+        draw(drawData: DrawData): void;
+        group(groupData: GroupData): void;
+        split(splitData: SplitData): void;
+        merge(mergeData: MergeData): void;
+        select(objectState: any): void;
+
+        fitCanvas(): void;
+        dragCanvas(enable: boolean): void;
+        zoomCanvas(enable: boolean): void;
+
+        cancel(): void;
+    }
 ```
 
-### CSS Classes/IDs
+### API CSS
 
-- Each drawn object (tag, shape, track) has id ```cvat_canvas_object_{objectState.id}```
+- All drawn objects (shapes, tracks) have an id ```cvat_canvas_shape_{objectState.clientID}```
 - Drawn shapes and tracks have classes ```cvat_canvas_shape```,
  ```cvat_canvas_shape_activated```,
  ```cvat_canvas_shape_grouping```,
  ```cvat_canvas_shape_merging```,
- ```cvat_canvas_shape_drawing```
-- Tags has a class ```cvat_canvas_tag```
+ ```cvat_canvas_shape_drawing```,
+ ```cvat_canvas_shape_occluded```
+- Drawn texts have the class ```cvat_canvas_text```
+- Tags have the class ```cvat_canvas_tag```
 - Canvas image has ID ```cvat_canvas_image```
-- Grid on the canvas has ID ```cvat_canvas_grid_pattern```
+- Grid on the canvas has ID ```cvat_canvas_grid``` and ```cvat_canvas_grid_pattern```
+- Crosshair during a draw has class ```cvat_canvas_crosshair```
 
 ### Events
 
 Standard JS events are used.
 ```js
     - canvas.setup
-    - canvas.activated => ObjectState
-    - canvas.deactivated
-    - canvas.moved => [ObjectState], x, y
-    - canvas.drawn => ObjectState
-    - canvas.edited => ObjectState
-    - canvas.splitted => ObjectState
-    - canvas.groupped => [ObjectState]
-    - canvas.merged => [ObjectState]
+    - canvas.activated => {state: ObjectState}
+    - canvas.clicked => {state: ObjectState}
+    - canvas.moved => {states: ObjectState[], x: number, y: number}
+    - canvas.find => {states: ObjectState[], x: number, y: number}
+    - canvas.drawn => {state: DrawnData}
+    - canvas.editstart
+    - canvas.edited => {state: ObjectState, points: number[]}
+    - canvas.splitted => {state: ObjectState}
+    - canvas.groupped => {states: ObjectState[]}
+    - canvas.merged => {states: ObjectState[]}
+    - canvas.canceled
+    - canvas.dragstart
+    - canvas.dragstop
+    - canvas.zoomstart
+    - canvas.zoomstop
+    - canvas.zoom
+    - canvas.fit
+    - canvas.dragshape => {id: number}
+    - canvas.resizeshape => {id: number}
 ```
 
-## States
+### WEB
+```js
+    // Create an instance of a canvas
+    const canvas = new window.canvas.Canvas();
 
- ![](images/states.svg)
+    console.log('Version ', window.canvas.CanvasVersion);
+    console.log('Current mode is ', window.canvas.mode());
+
+    // Put canvas to a html container
+    htmlContainer.appendChild(canvas.html());
+    canvas.fitCanvas();
+
+    // Next you can use its API methods. For example:
+    canvas.rotate(270);
+    canvas.draw({
+        enabled: true,
+        shapeType: 'rectangle',
+        crosshair: true,
+        rectDrawingMethod: window.Canvas.RectDrawingMethod.CLASSIC,
+    });
+```
 
 ## API Reaction
 
-|            | FREE | GROUPING | SPLITTING | DRAWING | MERGING | EDITING |
-|------------|------|----------|-----------|---------|---------|---------|
-| html()     | +    | +        | +         | +       | +       | +       |
-| setup()    | +    | +        | +         | +       | +       | -       |
-| activate() | +    | -        | -         | -       | -       | -       |
-| rotate()   | +    | +        | +         | +       | +       | +       |
-| focus()    | +    | +        | +         | +       | +       | +       |
-| fit()      | +    | +        | +         | +       | +       | +       |
-| grid()     | +    | +        | +         | +       | +       | +       |
-| draw()     | +    | -        | -         | -       | -       | -       |
-| split()    | +    | -        | +         | -       | -       | -       |
-| group      | +    | +        | -         | -       | -       | -       |
-| merge()    | +    | -        | -         | -       | +       | -       |
-| cancel()   | -    | +        | +         | +       | +       | +       |
+|              | IDLE | GROUPING | SPLITTING | DRAWING | MERGING | EDITING | DRAG | ZOOM |
+|--------------|------|----------|-----------|---------|---------|---------|------|------|
+| html()       | +    | +        | +         | +       | +       | +       | +    | +    |
+| setup()      | +    | +        | +         | +       | +       | -       | +    | +    |
+| activate()   | +    | -        | -         | -       | -       | -       | -    | -    |
+| rotate()     | +    | +        | +         | +       | +       | +       | +    | +    |
+| focus()      | +    | +        | +         | +       | +       | +       | +    | +    |
+| fit()        | +    | +        | +         | +       | +       | +       | +    | +    |
+| grid()       | +    | +        | +         | +       | +       | +       | +    | +    |
+| draw()       | +    | -        | -         | -       | -       | -       | -    | -    |
+| split()      | +    | -        | +         | -       | -       | -       | -    | -    |
+| group()      | +    | +        | -         | -       | -       | -       | -    | -    |
+| merge()      | +    | -        | -         | -       | +       | -       | -    | -    |
+| fitCanvas()  | +    | +        | +         | +       | +       | +       | +    | +    |
+| dragCanvas() | +    | -        | -         | -       | -       | -       | +    | -    |
+| zoomCanvas() | +    | -        | -         | -       | -       | -       | -    | +    |
+| cancel()     | -    | +        | +         | +       | +       | +       | +    | +    |
+| setZLayer()  | +    | +        | +         | +       | +       | +       | +    | +    |

@@ -26,7 +26,7 @@
         "eslint:recommended",
         "plugin:security/recommended",
         "plugin:no-unsanitized/DOM",
-        "airbnb",
+        "airbnb-base",
     ],
     "rules": {
         "no-await-in-loop": [0],
@@ -50,5 +50,6 @@
         "func-names": [0],
         "valid-typeof": [0],
         "no-console": [0], // this rule deprecates console.log, console.warn etc. because "it is not good in production code"
+        "max-classes-per-file": [0],
     },
 };

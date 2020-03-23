@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 Intel Corporation
+ * Copyright (C) 2018-2019 Intel Corporation
  *
  * SPDX-License-Identifier: MIT
  */
@@ -67,16 +67,16 @@ function blurAllElements() {
 
 function uploadAnnotation(jobId, shapeCollectionModel, historyModel, annotationSaverModel,
     uploadAnnotationButton, format) {
+    $('#annotationFileSelector').attr('accept', `.${format.format}`);
     $('#annotationFileSelector').one('change', async (changedFileEvent) => {
         const file = changedFileEvent.target.files['0'];
         changedFileEvent.target.value = '';
         if (!file) return;
-        uploadAnnotationButton.text('Uploading..');
         uploadAnnotationButton.prop('disabled', true);
         const annotationData = new FormData();
         annotationData.append('annotation_file', file);
         try {
-            await uploadJobAnnotationRequest(jobId, annotationData, format);
+            await uploadJobAnnotationRequest(jobId, annotationData, format.display_name);
             historyModel.empty();
             shapeCollectionModel.empty();
             const data = await $.get(`/api/v1/jobs/${jobId}/annotations`);
@@ -87,7 +87,6 @@ function uploadAnnotation(jobId, shapeCollectionModel, historyModel, annotationS
             showMessage(error.message);
         } finally {
             uploadAnnotationButton.prop('disabled', false);
-            uploadAnnotationButton.text('Upload Annotation');
         }
     }).click();
 }
@@ -296,6 +295,8 @@ function setupMenu(job, task, shapeCollectionModel,
                     <td> ${byLabelsStat[labelId].polylines.interpolation} </td>
                     <td> ${byLabelsStat[labelId].points.annotation} </td>
                     <td> ${byLabelsStat[labelId].points.interpolation} </td>
+                    <td> ${byLabelsStat[labelId].cuboids.annotation} </td>
+                    <td> ${byLabelsStat[labelId].cuboids.interpolation} </td>
                     <td> ${byLabelsStat[labelId].manually} </td>
                     <td> ${byLabelsStat[labelId].interpolated} </td>
                     <td class="semiBold"> ${byLabelsStat[labelId].total} </td>
@@ -313,6 +314,8 @@ function setupMenu(job, task, shapeCollectionModel,
                 <td> ${totalStat.polylines.interpolation} </td>
                 <td> ${totalStat.points.annotation} </td>
                 <td> ${totalStat.points.interpolation} </td>
+                <td> ${totalStat.cuboids.annotation} </td>
+                <td> ${totalStat.cuboids.interpolation} </td>
                 <td> ${totalStat.manually} </td>
                 <td> ${totalStat.interpolated} </td>
                 <td> ${totalStat.total} </td>
@@ -385,59 +388,69 @@ function setupMenu(job, task, shapeCollectionModel,
         $('#settingsWindow').removeClass('hidden');
     });
 
+    $('#openTaskButton').on('click', () => {
+        const win = window.open(
+            `${window.UI_URL}/tasks/${window.cvat.job.task_id}`, '_blank'
+        );
+        win.focus();
+    });
+
     $('#settingsButton').attr('title', `
         ${shortkeys.open_settings.view_value} - ${shortkeys.open_settings.description}`);
 
+    const downloadButton = $('#downloadAnnotationButton');
+    const uploadButton = $('#uploadAnnotationButton');
+
+    const loaders = {};
+
     for (const format of annotationFormats) {
-        for (const dumpSpec of format.dumpers) {
-            const listItem = $(`<li>${dumpSpec.display_name}</li>`).on('click', async () => {
-                $('#downloadAnnotationButton')[0].disabled = true;
-                $('#downloadDropdownMenu').addClass('hidden');
-                try {
-                    await dumpAnnotationRequest(task.id, task.name, dumpSpec.display_name);
-                } catch (error) {
-                    showMessage(error.message);
-                } finally {
-                    $('#downloadAnnotationButton')[0].disabled = false;
-                }
-            });
-            if (isDefaultFormat(dumpSpec.display_name, task.mode)) {
-                listItem.addClass('bold');
+        for (const dumper of format.dumpers) {
+            const item = $(`<option>${dumper.display_name}</li>`);
+
+            if (!isDefaultFormat(dumper.display_name, window.cvat.job.mode)) {
+                item.addClass('regular');
             }
-            $('#downloadDropdownMenu').append(listItem);
+
+            item.appendTo(downloadButton);
         }
 
         for (const loader of format.loaders) {
-            $(`<li>${loader.display_name}</li>`).on('click', async () => {
-                $('#uploadAnnotationButton')[0].disabled = true;
-                $('#uploadDropdownMenu').addClass('hidden');
-                try {
-                    userConfirm('Current annotation will be removed from the client. Continue?',
-                        async () => {
-                            await uploadAnnotation(
-                                job.id,
-                                shapeCollectionModel,
-                                historyModel,
-                                annotationSaverModel,
-                                $('#uploadAnnotationButton'),
-                                loader.display_name,
-                            );
-                        });
-                } catch (error) {
-                    showMessage(error.message);
-                } finally {
-                    $('#uploadAnnotationButton')[0].disabled = false;
-                }
-            }).appendTo('#uploadDropdownMenu');
+            loaders[loader.display_name] = loader;
+            $(`<option class="regular">${loader.display_name}</li>`).appendTo(uploadButton);
         }
     }
 
-    $('#downloadAnnotationButton').on('click', () => {
-        $('#downloadDropdownMenu').toggleClass('hidden');
+    downloadButton.on('change', async (e) => {
+        const dumper = e.target.value;
+        downloadButton.prop('value', 'Dump Annotation');
+        try {
+            downloadButton.prop('disabled', true);
+            await dumpAnnotationRequest(task.id, task.name, dumper);
+        } catch (error) {
+            showMessage(error.message);
+        } finally {
+            downloadButton.prop('disabled', false);
+        }
     });
 
-    $('#uploadAnnotationButton').on('click', () => {
-        $('#uploadDropdownMenu').toggleClass('hidden');
+    uploadButton.on('change', (e) => {
+        const loader = loaders[e.target.value];
+        uploadButton.prop('value', 'Upload Annotation');
+        userConfirm('Current annotation will be removed from the client. Continue?',
+            async () => {
+                try {
+                    await uploadAnnotation(
+                        job.id,
+                        shapeCollectionModel,
+                        historyModel,
+                        annotationSaverModel,
+                        $('#uploadAnnotationButton'),
+                        loader,
+                    );
+                } catch (error) {
+                    showMessage(error.message);
+                }
+            });
     });
 
     $('#removeAnnotationButton').on('click', () => {
@@ -496,6 +509,7 @@ function buildAnnotationUI(jobData, taskData, imageMetaData, annotationData, ann
             z_order: taskData.z_order,
             id: jobData.id,
             task_id: taskData.id,
+            mode: taskData.mode,
             images: imageMetaData,
         },
         search: {
@@ -573,7 +587,7 @@ function buildAnnotationUI(jobData, taskData, imageMetaData, annotationData, ann
     const shapeCreatorController = new ShapeCreatorController(shapeCreatorModel);
     const shapeCreatorView = new ShapeCreatorView(shapeCreatorModel, shapeCreatorController);
 
-    const polyshapeEditorModel = new PolyshapeEditorModel();
+    const polyshapeEditorModel = new PolyshapeEditorModel(shapeCollectionModel);
     const polyshapeEditorController = new PolyshapeEditorController(polyshapeEditorModel);
     const polyshapeEditorView = new PolyshapeEditorView(polyshapeEditorModel,
         polyshapeEditorController);
@@ -660,13 +674,15 @@ function buildAnnotationUI(jobData, taskData, imageMetaData, annotationData, ann
         'track count': totalStat.boxes.annotation + totalStat.boxes.interpolation
             + totalStat.polygons.annotation + totalStat.polygons.interpolation
             + totalStat.polylines.annotation + totalStat.polylines.interpolation
-            + totalStat.points.annotation + totalStat.points.interpolation,
+            + totalStat.points.annotation + totalStat.points.interpolation
+            + totalStat.cuboids.annotation + totalStat.cuboids.interpolation,
         'frame count': window.cvat.player.frames.stop - window.cvat.player.frames.start + 1,
         'object count': totalStat.total,
         'box count': totalStat.boxes.annotation + totalStat.boxes.interpolation,
         'polygon count': totalStat.polygons.annotation + totalStat.polygons.interpolation,
         'polyline count': totalStat.polylines.annotation + totalStat.polylines.interpolation,
         'points count': totalStat.points.annotation + totalStat.points.interpolation,
+        'cuboid count': totalStat.cuboids.annotation + totalStat.cuboids.interpolation,
     });
     loadJobEvent.close();
 

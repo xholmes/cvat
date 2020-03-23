@@ -6,6 +6,85 @@ const aboutDummyData = {
     "version": "0.5.dev20190516142240"
 }
 
+const formatsDummyData = [{
+    "id": 1,
+    "dumpers": [
+        {
+            "display_name": "CVAT XML 1.1 for videos",
+            "format": "XML",
+            "version": "1.1",
+            "handler": "dump_as_cvat_interpolation"
+        },
+        {
+            "display_name": "CVAT XML 1.1 for images",
+            "format": "XML",
+            "version": "1.1",
+            "handler": "dump_as_cvat_annotation"
+        }
+    ],
+    "loaders": [
+        {
+            "display_name": "CVAT XML 1.1",
+            "format": "XML",
+            "version": "1.1",
+            "handler": "load"
+        }
+    ],
+    "name": "CVAT",
+    "created_date": "2019-08-08T12:18:56.571488+03:00",
+    "updated_date": "2019-08-08T12:18:56.571533+03:00",
+    "handler_file": "cvat/apps/annotation/cvat.py",
+    "owner": null
+},
+{
+    "id": 2,
+    "dumpers": [
+        {
+            "display_name": "PASCAL VOC ZIP 1.0",
+            "format": "ZIP",
+            "version": "1.0",
+            "handler": "dump"
+        }
+    ],
+    "loaders": [
+        {
+            "display_name": "PASCAL VOC ZIP 1.0",
+            "format": "ZIP",
+            "version": "1.0",
+            "handler": "load"
+        }
+    ],
+    "name": "PASCAL VOC",
+    "created_date": "2019-08-08T12:18:56.625025+03:00",
+    "updated_date": "2019-08-08T12:18:56.625071+03:00",
+    "handler_file": "cvat/apps/annotation/pascal_voc.py",
+    "owner": null
+},
+{
+    "id": 3,
+    "dumpers": [
+        {
+            "display_name": "YOLO ZIP 1.0",
+            "format": "ZIP",
+            "version": "1.0",
+            "handler": "dump"
+        }
+    ],
+    "loaders": [
+        {
+            "display_name": "YOLO ZIP 1.0",
+            "format": "ZIP",
+            "version": "1.0",
+            "handler": "load"
+        }
+    ],
+    "name": "YOLO",
+    "created_date": "2019-08-08T12:18:56.667534+03:00",
+    "updated_date": "2019-08-08T12:18:56.667578+03:00",
+    "handler_file": "cvat/apps/annotation/yolo.py",
+    "owner": null
+}];
+
 const usersDummyData = {
     "count": 2,
     "next": null,
@@ -106,12 +185,46 @@ const shareDummyData = [
 ]
 
 const tasksDummyData = {
-    "count": 4,
+    "count": 5,
     "next": null,
     "previous": null,
     "results": [
         {
-            "url": "http://localhost:7000/api/v1/tasks/1",
+            "url": "http://localhost:7000/api/v1/tasks/102",
+            "id": 102,
+            "name": "Test",
+            "size": 1,
+            "mode": "annotation",
+            "owner": 1,
+            "assignee": null,
+            "bug_tracker": "",
+            "created_date": "2019-09-05T11:59:22.987942Z",
+            "updated_date": "2019-09-05T14:04:07.569344Z",
+            "overlap": 0,
+            "segment_size": 0,
+            "z_order": false,
+            "status": "annotation",
+            "labels": [{
+                "id": 5,
+                "name": "car",
+                "attributes": []
+            }],
+            "segments": [{
+                "start_frame": 0,
+                "stop_frame": 0,
+                "jobs": [{
+                    "url":"http://localhost:7000/api/v1/jobs/112",
+                    "id": 112,
+                    "assignee":null,
+                    "status":"annotation"
+                }]
+            }],
+            "image_quality": 50,
+            "start_frame": 0,
+            "stop_frame": 0,
+            "frame_filter": ""
+        }, {
+            "url": "http://localhost:7000/api/v1/tasks/100",
             "id": 100,
             "name": "Image Task",
             "size": 9,
@@ -147,7 +260,7 @@ const tasksDummyData = {
                   "stop_frame": 8,
                   "jobs": [
                      {
-                        "url": "http://localhost:7000/api/v1/jobs/1",
+                        "url": "http://localhost:7000/api/v1/jobs/100",
                         "id": 100,
                         "assignee": null,
                         "status": "annotation"
@@ -1308,6 +1421,48 @@ const tasksDummyData = {
 }
 
 const taskAnnotationsDummyData = {
+    '112': {
+        "version":21,
+        "tags": [],
+        "shapes": [{
+            "type": "rectangle",
+            "occluded": false,
+            "z_order": 1,
+            "points": [
+                557.7890625,
+                276.2216796875,
+                907.1888732910156,
+                695.5014038085938
+            ],
+            "id": 15,
+            "frame": 0,
+            "label_id": 5,
+            "group": 0,
+            "attributes": []
+        }],
+        "tracks": [{
+            "id": 15,
+            "frame": 0,
+            "label_id": 5,
+            "group": 0,
+            "shapes": [{
+                "type": "rectangle",
+                "occluded": false,
+                "z_order": 13,
+                "points": [
+                    792.787109375,
+                    16.5234375,
+                    1171.1027526855469,
+                    521.3458862304688
+                ],
+                "id": 22,
+                "frame": 0,
+                "outside": false,
+                "attributes": []
+            }],
+            "attributes": []
+        }]
+    },
     '101': {
         "version":21,
         "tags":[],
@@ -2435,6 +2590,10 @@ const frameMetaDummyData = {
           "width": 1888,
           "height": 1408
     }],
+    102: [{
+        "width":1920,
+        "height":1080
+    }],
 }
 
 module.exports = {
@@ -2445,4 +2604,5 @@ module.exports = {
     taskAnnotationsDummyData,
     jobAnnotationsDummyData,
     frameMetaDummyData,
+    formatsDummyData,
 }
